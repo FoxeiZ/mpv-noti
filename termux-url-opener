@@ -1,0 +1,65 @@
+#!/data/data/com.termux/files/usr/bin/sh
+
+
+stringContain() { [ -z "${2##*$1*}" ]; }
+
+url=$1
+if stringContain '/c/' "$url"; then url=$url"/videos";fi
+if stringContain '/channel/' "$url"; then url=$url"/videos";fi
+
+noti(){
+    su -lp 2000 -c "cmd notification post -S bigtext --title '$1' lmao '$2'" > /dev/null 2>&1
+}
+
+tms(){
+    termux-media-scan -r /sdcard/Music/youtube-dl/
+}
+
+startmpv(){
+    mpv --force-seekable=yes --no-video --ytdl-format="93/bestaudio[ext=webm]/bestaudio/best" --idle "$@"
+}
+
+socket_handler(){
+    if [ -S "$PWD/bin/mpvsocket" ]  # check if we already have a socket
+    then
+        alive=`echo '{"command": []}' | jq -c --arg url "$url" '.command = ["loadfile", $url, "append-play"]' | socat - "$PWD/bin/mpvsocket"`
+
+        if [ -z "$alive" ]  # we do have a socket, but if nothing responds, we remove it and make a new one
+        then
+            rm -f "$PWD/bin/mpvsocket"
+            return
+        fi
+
+        echo '{"command": []}' | jq -c --arg msg "[ipc] Added $url" '.command = ["print-text", $msg]' | socat - "$PWD/bin/mpvsocket"
+        exit 0
+    fi
+    return  # call when no socket avaliable
+}
+
+
+if socket_handler  # check if socket is alive
+then
+    echo "$url"
+    echo 'a - Audio Only'
+    echo 'v - Video w/au'
+    echo 'p - Play now ?'
+    echo 'c - Play w/cache'
+    echo 'i - Cache and open IPC server'
+    read n
+
+    clear
+    echo "$url\n"
+
+    case $n in
+        a)yt-dlp --no-mtime -f "bestaudio[ext=webm]/bestaudio[ext=m4a]/best" -ciw -o "/sdcard/Music/youtube-dl/%(title)s.%(ext)s" -v --extract-audio --audio-quality 164k --audio-format mp3 --write-sub --sub-lang en,ja,vi --convert-subs lrc --exec 'termux-notification -t {} -c "`du {} -h | cut -f1`"' $url && tms;;
+        v)yt-dlp --no-mtime -f 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best' -ciw --merge-output-format mp4 --write-sub --sub-lang en,ja,vi --exec 'termux-notification -t {} -c "`du {} -h | cut -f1`"' -v -o "/sdcard/Music/youtube-dl/%(title)s.%(ext)s" $url && tms;;
+        p)startmpv --no-cache "$url";;
+        c)startmpv "$url";;
+        i)trap "rm $PWD/bin/mpvsocket; exit 0" 2 3 9 15;
+          startmpv "$url" --input-ipc-server="$PWD/bin/mpvsocket";
+          rm "$PWD/bin/mpvsocket";;
+    esac
+
+    read -p "Enter to exit" i
+    exit 0
+fi
