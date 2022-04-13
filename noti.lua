@@ -63,6 +63,30 @@ function removeNotification()
 end
 
 
+-- main entry
+function main(event)
+    local songtitle = mp.get_property("media-title")
+    local artist = mp.get_property_native("metadata/by-key/Artist")
+    if songtitle ~= nil then
+        filename = songtitle
+    end
+
+    if artist ~= nil then
+        filename = ("%s - %s"):format(artist, filename)
+    end
+
+    -- just to make sure that we dont get nil or the script will fuckup    
+    totalTime = mp.get_property("duration")
+    while totalTime == nil do
+        totalTime = mp.get_property("duration")
+    end
+    totalTime = tonumber(totalTime)
+    format_totalTime = SecondsToClock(totalTime)
+
+    postNotification(status..' '..filename, format_totalTime)
+end
+
+
 -- update status
 local function pause_change(name, data)
     if active then
@@ -110,7 +134,7 @@ local function title_change(name, data)
 end
 
 --status update function
-local function enable_update_status()
+function enable_update_status()
     mp.observe_property('mute', 'bool', mute_change)
     mp.observe_property('pause', 'bool', pause_change)
     mp.observe_property('media-title', 'string', title_change)
@@ -118,7 +142,7 @@ local function enable_update_status()
     mp.observe_property('loop-playlist', 'string', loop_playlist_change)
 end
 
-local function disable_update_status()
+function disable_update_status()
     mp.unobserve_property(mute_change)
     mp.unobserve_property(pause_change)
     mp.unobserve_property(title_change)
@@ -126,52 +150,28 @@ local function disable_update_status()
     mp.unobserve_property(loop_playlist_change)
 end
 
+-- register events to mpv
+local function init(event)
+    enable_update_status()
+    main(event)
+end
 
---toggle function
 function toggle()
     active = not active
 
     if active then
-        mp.register_event("file-loaded", main)
+        mp.register_event("file-loaded", init)
+        enable_update_status()
         main()
     else
-        mp.unregister_event(main)
+        mp.unregister_event(init)
         disable_update_status()
         removeNotification()
     end
     print('Toggle for noti:', active)
 end
 
-
--- main entry
-function main(event)
-
-    enable_update_status()
-
-    local songtitle = mp.get_property("media-title")
-    local artist = mp.get_property_native("metadata/by-key/Artist")
-    if songtitle ~= nil then
-        filename = songtitle
-    end
-
-    if artist ~= nil then
-        filename = ("%s - %s"):format(artist, filename)
-    end
-
-    -- just to make sure that we dont get nil or the script will fuckup    
-    totalTime = mp.get_property("duration")
-    while totalTime == nil do
-        totalTime = mp.get_property("duration")
-    end
-    totalTime = tonumber(totalTime)
-    format_totalTime = SecondsToClock(totalTime)
-
-    postNotification(status..' '..filename, format_totalTime)
-end
-
-
--- register events to mpv
-mp.register_event("file-loaded", main)
+mp.register_event("file-loaded", init)
 mp.register_event("end-file", disable_update_status)
 mp.add_key_binding("y", "noti_toggle", toggle)
 mp.register_event("shutdown",
