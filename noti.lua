@@ -65,10 +65,10 @@ end
 
 -- main entry
 function main(event)
-    local songtitle = mp.get_property("media-title")
+    local songTitle = mp.get_property("media-title")
     local artist = mp.get_property_native("metadata/by-key/Artist")
-    if songtitle ~= nil then
-        filename = songtitle
+    if songTitle ~= nil then
+        filename = songTitle
     end
 
     if artist ~= nil then
@@ -81,18 +81,20 @@ function main(event)
         totalTime = mp.get_property("duration")
     end
     totalTime = tonumber(totalTime)
-    format_totalTime = SecondsToClock(totalTime)
+    local content = SecondsToClock(totalTime)
 
-    postNotification(status..' '..filename, format_totalTime)
+    local chapterTitle = mp.get_property("chapter-metadata/title")
+    if chapterTitle ~= nil then
+        local chapterNow = mp.get_property("chapter")
+        local chapterTotal = mp.get_property("chapters")
+        content = ("(%s - %s/%s) %s"):format(content, chapterNow+1, chapterTotal, chapterTitle)
+    end
+
+    postNotification(status..' '..filename, content)
 end
 
 
 -- update status
-local function pause_change(name, data)
-    if active then
-        main()
-    end
-end
 
 local function mute_change(name, data)
     if data then
@@ -100,9 +102,7 @@ local function mute_change(name, data)
     else
         status = substring(status, '🔇', '')
     end
-    if active then
-        main()
-    end
+    main()
 end
 
 local function loop_file_change(name, data)
@@ -111,9 +111,7 @@ local function loop_file_change(name, data)
     elseif data == 'no' then
         status = substring(status, '🔂', '')
     end
-    if active then
-        main()
-    end
+    main()
 end
 
 local function loop_playlist_change(name, data)
@@ -122,30 +120,22 @@ local function loop_playlist_change(name, data)
     elseif data == 'no' then
         status = substring(status, '🔁', '')
     end
-    if active then
-        main()
-    end
-end
-
-local function title_change(name, data)
-    if active then
-        main()
-    end
+    main()
 end
 
 --status update function
 function enable_update_status()
     mp.observe_property('mute', 'bool', mute_change)
-    mp.observe_property('pause', 'bool', pause_change)
-    mp.observe_property('media-title', 'string', title_change)
+    mp.observe_property('pause', 'bool', main)
+    mp.observe_property('chapter-metadata/title', 'string', main)
+    mp.observe_property('media-title', 'string', main)
     mp.observe_property('loop-file', 'string', loop_file_change)
     mp.observe_property('loop-playlist', 'string', loop_playlist_change)
 end
 
 function disable_update_status()
     mp.unobserve_property(mute_change)
-    mp.unobserve_property(pause_change)
-    mp.unobserve_property(title_change)
+    mp.unobserve_property(main)
     mp.unobserve_property(loop_file_change)
     mp.unobserve_property(loop_playlist_change)
 end
