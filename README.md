@@ -8,7 +8,10 @@ cp noti.lua ~/.config/mpv/scripts
 ```
 
 # mpv-noti
-![screenshot1](/screenshots/1.png)
-![screenshot2](/screenshots/2.png)
+
+|  | Image |
+| :-: | :-: |
+| Normal | ![screenshot1](/screenshots/1.png) |
+| With chapters | ![screenshot2](/screenshots/2.png) |
 
 # 🚧 STILL UNDER CONSTRUCTION
