@@ -38,7 +38,7 @@ end
 
 local function postNotification(title, content)
     command = {'termux-notification', '-i', id, '--type', 'media',
-            '-t', title, '-c', content, '--ongoing',
+            '-t', title, '-c', content, '--ongoing', '--alert-once',
             '--media-previous', 'echo playlist-prev | socat - '..socket,
             '--media-play', 'echo "cycle pause" | socat - '..socket,
             '--media-pause', 'echo "cycle pause" | socat - '..socket,
@@ -61,6 +61,7 @@ function removeNotification()
     print('Removing notification...')
     utils.subprocess_detached({args={'termux-notification-remove', id}, cancellable = false })
 end
+
 
 
 -- main entry
@@ -95,8 +96,11 @@ end
 
 
 -- update status
-
 local function mute_change(name, data)
+    if status:match('🔇') then
+        return
+    end
+
     if data then
         status = status..'🔇'
     else
@@ -106,6 +110,10 @@ local function mute_change(name, data)
 end
 
 local function loop_file_change(name, data)
+    if status:match('🔂') then
+        return
+    end
+
     if data == 'inf' then
         status = status..'🔂'
     elseif data == 'no' then
@@ -115,6 +123,10 @@ local function loop_file_change(name, data)
 end
 
 local function loop_playlist_change(name, data)
+    if status:match('🔁') then
+        return
+    end
+
     if data == 'inf' then
         status = status..'🔁'
     elseif data == 'no' then
@@ -146,6 +158,7 @@ local function init(event)
     main(event)
 end
 
+
 function toggle()
     active = not active
 
@@ -161,8 +174,17 @@ function toggle()
     print('Toggle for noti:', active)
 end
 
+
 mp.register_event("file-loaded", init)
-mp.register_event("end-file", disable_update_status)
+mp.register_event("end-file",
+    function()
+        if tonumber(mp.get_property("playlist-pos-1")) < 0 then
+            postNotification(status..' Idling', 'Waiting for command...')
+            print('thonk')
+        end
+        disable_update_status()
+    end
+)
 mp.add_key_binding("y", "noti_toggle", toggle)
 mp.register_event("shutdown",
     function()
