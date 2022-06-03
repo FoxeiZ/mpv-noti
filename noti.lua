@@ -9,16 +9,31 @@ status = ''
 filename = ''
 
 id = 'mpv.'..utils.getpid()
-socket = '/data/data/com.termux/files/home/bin/mpvsocket'
 removeSocket = false
 
-if mp.get_property('options/input-ipc-server') == '' then
+if mp.get_property('input-ipc-server') == '' then
     print('setup ipc server')
-    mp.set_property("options/input-ipc-server", '/data/data/com.termux/files/home/.config/mpv/socket/'..id)
     socket = '/data/data/com.termux/files/home/.config/mpv/socket/'..id
+    mp.set_property("options/input-ipc-server", socket)
     removeSocket = true
+else
+    local working_dir = mp.get_property('working-directory')
+    local ipc = mp.get_property('input-ipc-server')
+    print(working_dir, ipc)
+    if string.match(ipc, '/data/data/com.termux/files/') then
+        socket = ipc
+    else
+        socket = working_dir .. '/' .. ipc
+    end
 end
 
+
+local function subprocess(args, detach)
+    local x = mp.command_native({name = "subprocess",
+                                 playback_only = false,
+                                 args = args,
+                                 detach = detach or 'no'})
+end
 
 local function SecondsToClock(seconds)
     if seconds == nil or seconds <= 0 then
@@ -53,13 +68,13 @@ local function postNotification(title, content)
     end
 
 
-    utils.subprocess( { args=command, cancellable=true } )
+    subprocess(command)
     --utils.subprocess({args={'su', '-lp', '2000', '-c', "cmd notification post -S bigtext -t '"..title.."' mpv_playback '"..content.."'"}, cancellable = true })
 end
 
 function removeNotification()
     print('Removing notification...')
-    utils.subprocess_detached({args={'termux-notification-remove', id}, cancellable = false })
+    subprocess({'termux-notification-remove', id}, 'yes')
 end
 
 
@@ -110,11 +125,7 @@ local function mute_change(name, data)
 end
 
 local function loop_file_change(name, data)
-    if status:match('🔂') then
-        return
-    end
-
-    if data == 'inf' then
+    if data == 'inf' and not status:match('🔂')then
         status = status..'🔂'
     elseif data == 'no' then
         status = substring(status, '🔂', '')
@@ -123,11 +134,7 @@ local function loop_file_change(name, data)
 end
 
 local function loop_playlist_change(name, data)
-    if status:match('🔁') then
-        return
-    end
-
-    if data == 'inf' then
+    if data == 'inf' and not status:match('🔁') then
         status = status..'🔁'
     elseif data == 'no' then
         status = substring(status, '🔁', '')
@@ -176,7 +183,7 @@ end
 
 
 mp.register_event("file-loaded", init)
-mp.register_event("end-file",
+mp.register_event("end-file", 
     function()
         if tonumber(mp.get_property("playlist-pos-1")) < 0 then
             postNotification(status..' Idling', 'Waiting for command...')
@@ -188,11 +195,11 @@ mp.register_event("end-file",
 mp.add_key_binding("y", "noti_toggle", toggle)
 mp.register_event("shutdown",
     function()
-        removeNotification()
-        disable_update_status()
         if removeSocket then
             print('Removing socket...')
             os.remove(socket)
+        removeNotification()
+        disable_update_status()
         end
     end
 )
