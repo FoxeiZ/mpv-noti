@@ -112,11 +112,7 @@ end
 
 -- update status
 local function mute_change(name, data)
-    if status:match('🔇') then
-        return
-    end
-
-    if data then
+    if data and not status:match('🔇') then
         status = status..'🔇'
     else
         status = substring(status, '🔇', '')
