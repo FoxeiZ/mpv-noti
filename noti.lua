@@ -19,7 +19,6 @@ if mp.get_property('input-ipc-server') == '' then
 else
     local working_dir = mp.get_property('working-directory')
     local ipc = mp.get_property('input-ipc-server')
-    print(working_dir, ipc)
     if string.match(ipc, '/data/data/com.termux/files/') then
         socket = ipc
     else
@@ -183,7 +182,6 @@ mp.register_event("end-file",
     function()
         if tonumber(mp.get_property("playlist-pos-1")) < 0 then
             postNotification(status..' Idling', 'Waiting for command...')
-            print('thonk')
         end
         disable_update_status()
     end
